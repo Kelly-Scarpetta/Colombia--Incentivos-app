@@ -827,142 +827,103 @@ async function buscar(){
   if(!ced){ msg('s-msg','err','La cédula es obligatoria.'); return; }
   msg('s-msg','load','Buscando...');
   document.getElementById('s-res').innerHTML='';
+  const cedLimpia = ced.replace(/\D/g,'');
+  let totalResultados = 0;
+  let html = '';
+
+  // ── Búsqueda 1: Tarjetas Incentivos ──
   try{
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=1946571877`;
-    let res=await fetch(url);
-    if(!res.ok) throw new Error('HTTP '+res.status+' — La hoja no esta publica o el ID es incorrecto');
-    const txt=await res.text();
-    if(txt.includes('<!DOCTYPE')||txt.includes('<html')){
-      throw new Error('La hoja requiere inicio de sesion. Acceso general debe ser Lector para cualquier persona');
-    }
-    // Parser CSV correcto: respeta celdas con saltos de línea entre comillas
-    function parseCSV(text){
-      const rows=[];
-      let row=[], cur='', inQ=false, i=0;
-      while(i<text.length){
-        const ch=text[i];
-        if(ch==='"'){
-          if(inQ && text[i+1]==='"'){cur+='"';i+=2;continue;} // comilla escapada
-          inQ=!inQ; i++; continue;
-        }
-        if(ch===',' && !inQ){row.push(cur.trim());cur='';i++;continue;}
-        if((ch==='\n'||ch==='\r') && !inQ){
-          if(ch==='\r'&&text[i+1]==='\n')i++;
-          row.push(cur.trim());rows.push(row);row=[];cur='';i++;continue;
-        }
-        cur+=ch; i++;
-      }
-      if(cur.trim()||row.length){row.push(cur.trim());rows.push(row);}
-      return rows;
-    }
-    const rows=parseCSV(txt);
-    const hdr=rows[0];
-    // Índices fijos confirmados con el Sheet real:
-    // A=0:Mes del pago | B=1:IDENTIFICACIÓN | C=2:TARJETA N° | D=3:Valor Cargado
-    // E=4:NOMBRE Y APELLIDO | I=8:AGENCIA | J=9:CORREO | K=10:EJECUTIVO
-    // L=11:Meses pagados | M=12:Estado de pago | N=13:Fecha de carga
-    const iCed  = 1;   // B: IDENTIFICACIÓN
-    const iNom  = 4;   // E: NOMBRE Y APELLIDO
-    const iTar  = 2;   // C: TARJETA N°
-    const iVal  = 3;   // D: Valor Cargado
-    const iMes  = 0;   // A: Mes del pago (mes de liquidación)
-    const iMeses= 11;  // L: Meses pagados (todos los meses en la celda)
-    const iAg   = 8;   // I: AGENCIA
-    const iMail = 9;   // J: CORREO
-    const iEjec = 10;  // K: EJECUTIVO
-    const iEst  = 12;  // M: Estado de pago
-    const iFecha= 13;  // N: Fecha de carga
-    const found=rows.slice(1).filter(r=>{
-      const c=(r[iCed]||'').toString().replace(/\D/g,'');
-      const m=(r[iMail]||'').toLowerCase();
-      return c===ced.replace(/\D/g,'') && (mail?m.includes(mail):true) && r.join('').trim();
-    });
-    if(!found.length){ msg('s-msg','err','Sin resultados para esa cédula.'); return; }
-    let total=0, html='';
-    html+=`<span class="section-title section-title-incentivos">🎴 Tarjetas Incentivos — ${found.length} registro(s)</span>`;
-    found.forEach(r=>{
-      const val   = parseFloat((r[iVal]||'').toString().replace(/[^0-9.]/g,''))||0;
-      total += val;
-      const nombre = r[iNom]||'—';
-      const cedula = r[iCed]||'—';
-      const tarjeta= r[iTar]||'—';
-      const mesLiq = r[iMes]||'—';
-      // Meses pagados: pueden ser varios separados por salto de línea
-      const mesesRaw = (r[iMeses]||'').toString().trim();
-      const mesesList= mesesRaw ? mesesRaw.split(/[\n\r]+/).map(m=>m.trim()).filter(m=>m) : [mesLiq];
-      const agencia= r[iAg]  ||'—';
-      const ejec   = r[iEjec] ||'—';
-      const estado = r[iEst]  ||'—';
-      const fecha  = r[iFecha]||'—';
-      // Construir pills de meses
-      const mesesHtml = mesesList.map(m=>`<span class="mes-pill">${m}</span>`).join(' ');
-      html+=`<div class="res-card">
-        <div class="res-name">${nombre}</div>
-        <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${cedula}</span></div>
-        <div class="res-row"><span class="res-k">Tarjeta N°</span><span class="res-v">${tarjeta}</span></div>
-        <div class="res-row res-row-meses"><span class="res-k">Meses pagados</span><span class="res-v meses-wrap">${mesesHtml}</span></div>
-        <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${agencia}</span></div>
-        <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${ejec}</span></div>
-        <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${estado.toLowerCase().includes('pagado')?'ok':'pen'}">${estado||'—'}</span></div>
-        <div class="res-row"><span class="res-k">Fecha de carga</span><span class="res-v">${fecha}</span></div>
-        <div class="res-row"><span class="res-k">Valor cargado</span><span class="res-v">$${val.toLocaleString('es-CO')}</span></div>
-      </div>`;
-    });
-    html+=`<div class="total-box">Total pagado: $${total.toLocaleString('es-CO')}<br>
-      <small style="font-weight:600;font-size:.76rem">${found.length} registro(s)</small></div>`;
-    document.getElementById('s-res').innerHTML=html;
-    msg('s-msg','ok',`${found.length} registro(s) de incentivos encontrado(s). Buscando facturas...`);
-
-    // ── Buscar en Sheet de Facturas ──
-    try{
-      const url2=`https://docs.google.com/spreadsheets/d/${SHEET_FACTURAS_ID}/export?format=csv&gid=0`;
-      const res2=await fetch(url2);
-      if(res2.ok){
-        const txt2=await res2.text();
-        if(!txt2.includes('<!DOCTYPE')){
-          const rows2=parseCSV(txt2);
-          const hdr2=rows2[0];
-          // Columnas fijas confirmadas:
-          // B=1:Cedula | C=2:Agencia | D=3:Agente | F=5:Ejecutivo
-          // L=11:Periodo | M=12:Valor | N=13:Medio de pago | O=14:Estado
-          const found2=rows2.slice(1).filter(r=>{
-            const c=(r[1]||'').toString().replace(/\D/g,'');
-            return c===ced.replace(/\D/g,'') && r.join('').trim();
+    const res=await fetch(url);
+    if(res.ok){
+      const txt=await res.text();
+      if(!txt.includes('<!DOCTYPE')){
+        const rows=parseCSV(txt);
+        const iCed=1, iNom=4, iTar=2, iVal=3, iMes=0, iMeses=11, iAg=8, iMail=9, iEjec=10, iEst=12, iFecha=13;
+        const found=rows.slice(1).filter(r=>{
+          const c=(r[iCed]||'').toString().replace(/\D/g,'');
+          const m=(r[iMail]||'').toLowerCase();
+          return c===cedLimpia && (mail?m.includes(mail):true) && r.join('').trim();
+        });
+        if(found.length>0){
+          totalResultados+=found.length;
+          let total=0;
+          html+=`<span class="section-title section-title-incentivos">🎴 Tarjetas Incentivos — ${found.length} registro(s)</span>`;
+          found.forEach(r=>{
+            const val=parseFloat((r[iVal]||'').toString().replace(/[^0-9.]/g,''))||0;
+            total+=val;
+            const mesesRaw=(r[iMeses]||'').toString().trim();
+            const mesesList=mesesRaw?mesesRaw.split(/[\n\r]+/).map(m=>m.trim()).filter(m=>m):[r[iMes]||'—'];
+            const mesesHtml=mesesList.map(m=>`<span class="mes-pill">${m}</span>`).join(' ');
+            html+=`<div class="res-card">
+              <div class="res-name">${r[iNom]||'—'}</div>
+              <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${r[iCed]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Tarjeta N°</span><span class="res-v">${r[iTar]||'—'}</span></div>
+              <div class="res-row res-row-meses"><span class="res-k">Meses pagados</span><span class="res-v meses-wrap">${mesesHtml}</span></div>
+              <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r[iAg]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r[iEjec]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${(r[iEst]||'').toLowerCase().includes('pagado')?'ok':'pen'}">${r[iEst]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Fecha de carga</span><span class="res-v">${r[iFecha]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Valor cargado</span><span class="res-v">$${val.toLocaleString('es-CO')}</span></div>
+            </div>`;
           });
-          if(found2.length>0){
-            let total2=0, html2='';
-            html2+=`<div style="margin-top:1.25rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${found2.length} registro(s)</span></div>`;
-            found2.forEach(r=>{
-              const val2=parseFloat((r[12]||'').toString().replace(/[^0-9.]/g,''))||0;
-              total2+=val2;
-              html2+=`<div class="res-card-facturas">
-                <div class="res-name">${r[3]||'—'}</div>
-                <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${r[1]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r[2]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r[5]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Periodo</span><span class="res-v">${r[11]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Medio de pago</span><span class="res-v">${r[13]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${(r[14]||'').toLowerCase().includes('enviado')?'ok':(r[14]||'').toLowerCase().includes('tramite')?'pen':''}">${r[14]||'—'}</span></div>
-                <div class="res-row"><span class="res-k">Valor</span><span class="res-v">$${val2.toLocaleString('es-CO')}</span></div>
-              </div>`;
-            });
-            html2+=`<div class="total-box-facturas">Total facturas: $${total2.toLocaleString('es-CO')}<br>
-              <small style="font-weight:600;font-size:.76rem">${found2.length} registro(s)</small></div>`;
-            document.getElementById('s-res').innerHTML += html2;
-          }
+          html+=`<div class="total-box">Total incentivos: $${total.toLocaleString('es-CO')}<br>
+            <small style="font-weight:600;font-size:.76rem">${found.length} registro(s)</small></div>`;
         }
       }
-    }catch(e2){ console.error('Facturas error:', e2); }
+    }
+  }catch(e1){ console.error('Incentivos error:', e1); }
 
-    // Update message
-    const totalRegs = document.querySelectorAll('#s-res .res-card, #s-res .res-card-facturas').length;
-    msg('s-msg','ok',`Búsqueda completada — ${totalRegs} registro(s) encontrado(s).`);
+  // ── Búsqueda 2: Pago de Facturas (independiente) ──
+  try{
+    const url2=`https://docs.google.com/spreadsheets/d/${SHEET_FACTURAS_ID}/export?format=csv&gid=0`;
+    const res2=await fetch(url2);
+    if(res2.ok){
+      const txt2=await res2.text();
+      if(!txt2.includes('<!DOCTYPE')){
+        const rows2=parseCSV(txt2);
+        // B=1:Cedula | C=2:Agencia | D=3:Agente | F=5:Ejecutivo
+        // L=11:Periodo | M=12:Valor | N=13:Medio de pago | O=14:Estado(Abonado)
+        const found2=rows2.slice(1).filter(r=>{
+          const c=(r[1]||'').toString().replace(/\D/g,'');
+          return c===cedLimpia && r.join('').trim();
+        });
+        if(found2.length>0){
+          totalResultados+=found2.length;
+          let total2=0;
+          html+=`<div style="margin-top:1.25rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${found2.length} registro(s)</span></div>`;
+          found2.forEach(r=>{
+            const val2=parseFloat((r[12]||'').toString().replace(/[^0-9.]/g,''))||0;
+            total2+=val2;
+            const estado2=r[14]||'—';
+            const estadoClass=estado2.toLowerCase().includes('abonado')?'ok':estado2.toLowerCase().includes('rechaz')?'err':'pen';
+            html+=`<div class="res-card-facturas">
+              <div class="res-name">${r[3]||'—'}</div>
+              <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${r[1]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r[2]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r[5]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Periodo</span><span class="res-v">${r[11]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Medio de pago</span><span class="res-v">${r[13]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${estadoClass}">${estado2}</span></div>
+              <div class="res-row"><span class="res-k">Valor</span><span class="res-v">$${val2.toLocaleString('es-CO')}</span></div>
+            </div>`;
+          });
+          html+=`<div class="total-box-facturas">Total facturas: $${total2.toLocaleString('es-CO')}<br>
+            <small style="font-weight:600;font-size:.76rem">${found2.length} registro(s)</small></div>`;
+        }
+      }
+    }
+  }catch(e2){ console.error('Facturas error:', e2); }
 
-  }catch(e){
-    msg('s-msg','err', e.message || 'Error al consultar la hoja.');
-    console.error('Buscar error:', e);
+  // ── Mostrar resultados ──
+  if(totalResultados===0){
+    msg('s-msg','err','Sin resultados para esa cédula en ningún archivo.');
+  } else {
+    document.getElementById('s-res').innerHTML = html;
+    msg('s-msg','ok',`Búsqueda completada — ${totalResultados} registro(s) encontrado(s).`);
   }
 }
+
 
 // ── SOLICITAR TARJETA ─────────────────────────────────────────
 async function solicitarTarjeta(){
