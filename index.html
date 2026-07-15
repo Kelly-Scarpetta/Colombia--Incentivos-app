@@ -821,6 +821,27 @@ function shareQR(imgId){
 }
 
 // ── BUSCAR PAGOS ──────────────────────────────────────────────
+// ── CSV Parser correcto: respeta celdas con saltos de línea entre comillas ──
+function parseCSV(text){
+  const rows=[];
+  let row=[], cur='', inQ=false, i=0;
+  while(i<text.length){
+    const ch=text[i];
+    if(ch==='"'){
+      if(inQ && text[i+1]==='"'){cur+='"';i+=2;continue;}
+      inQ=!inQ; i++; continue;
+    }
+    if(ch===',' && !inQ){row.push(cur.trim());cur='';i++;continue;}
+    if((ch==='\n'||ch==='\r') && !inQ){
+      if(ch==='\r'&&text[i+1]==='\n')i++;
+      row.push(cur.trim());rows.push(row);row=[];cur='';i++;continue;
+    }
+    cur+=ch; i++;
+  }
+  if(cur.trim()||row.length){row.push(cur.trim());rows.push(row);}
+  return rows;
+}
+
 async function buscar(){
   const ced=v('s-ced').trim();
   const mail=v('s-mail').trim().toLowerCase();
