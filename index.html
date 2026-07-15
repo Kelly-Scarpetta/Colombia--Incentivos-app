@@ -883,27 +883,28 @@ async function buscar(){
       if(!txt2.includes('<!DOCTYPE')){
         const rows2=parseCSV(txt2);
         // B=1:Cedula | C=2:Agencia | D=3:Agente | F=5:Ejecutivo
-        // L=11:Periodo | M=12:Valor | N=13:Medio de pago | O=14:Estado(Abonado)
-        const found2=rows2.slice(1).filter(r=>{
+        // [1]Cedula [2]Agencia [3]Agente [5]Ejecutivo [10]Periodo [11]Valor [12]MedioPago [13]Estado
+        // El archivo tiene múltiples filas de encabezado - buscar desde la primera fila con cédula numérica
+        const found2=rows2.filter(r=>{
           const c=(r[1]||'').toString().replace(/\D/g,'');
-          return c===cedLimpia && r.join('').trim();
+          return c===cedLimpia && c.length >= 6 && r.join('').trim();
         });
         if(found2.length>0){
           totalResultados+=found2.length;
           let total2=0;
           html+=`<div style="margin-top:1.25rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${found2.length} registro(s)</span></div>`;
           found2.forEach(r=>{
-            const val2=parseFloat((r[12]||'').toString().replace(/[^0-9.]/g,''))||0;
+            const val2=parseFloat((r[11]||'').toString().replace(/[^0-9.]/g,''))||0;
             total2+=val2;
-            const estado2=r[14]||'—';
+            const estado2=r[13]||'—';
             const estadoClass=estado2.toLowerCase().includes('abonado')?'ok':estado2.toLowerCase().includes('rechaz')?'err':'pen';
             html+=`<div class="res-card-facturas">
               <div class="res-name">${r[3]||'—'}</div>
               <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${r[1]||'—'}</span></div>
               <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r[2]||'—'}</span></div>
               <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r[5]||'—'}</span></div>
-              <div class="res-row"><span class="res-k">Periodo</span><span class="res-v">${r[11]||'—'}</span></div>
-              <div class="res-row"><span class="res-k">Medio de pago</span><span class="res-v">${r[13]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Periodo</span><span class="res-v">${r[10]||'—'}</span></div>
+              <div class="res-row"><span class="res-k">Medio de pago</span><span class="res-v">${r[12]||'—'}</span></div>
               <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${estadoClass}">${estado2}</span></div>
               <div class="res-row"><span class="res-k">Valor</span><span class="res-v">$${val2.toLocaleString('es-CO')}</span></div>
             </div>`;
