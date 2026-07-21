@@ -863,7 +863,7 @@ async function buscar(){
       const m=(r[iMail]||'').toLowerCase();
       return c===ced.replace(/\D/g,'') && (mail?m.includes(mail):true) && r.join('').trim();
     });
-    if(!found.length){ msg('s-msg','err','Sin resultados para esa cédula.'); return; }
+    if(!found.length){ msg('s-msg','load','Buscando en facturas...'); }
     let total=0, html='';
     found.forEach(r=>{
       const val=parseFloat((r[iVal]||'').toString().replace(/[^0-9.]/g,''))||0;
