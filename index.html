@@ -866,7 +866,7 @@ async function buscar(){
     if(!found.length){ msg('s-msg','load','Buscando en facturas...'); }
     let total=0, html='';
     found.forEach(r=>{
-      const val=parseFloat((r[iVal]||'').toString().replace(/[^0-9.]/g,''))||0;
+      const val=parseFloat((r[iVal]||'').toString().replace(/[^0-9,]/g,'').replace(',','.'))||0;
       total+=val;
       const mesesRaw=(r[iMeses]||'').toString().trim();
       const mesesList=mesesRaw?mesesRaw.split(/[\n\r]+/).map(m=>m.trim()).filter(m=>m):[r[iMes]||'—'];
@@ -902,7 +902,7 @@ async function buscar(){
         let html2 = `<div style="margin-top:1rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${d2.results.length} registro(s)</span></div>`;
         let total2 = 0;
         d2.results.filter(r=>(r.estado||'').toLowerCase().includes('abonado')).forEach(r=>{
-          const val2 = parseFloat((r.valor||'').toString().replace(/[^0-9.]/g,''))||0;
+          const val2 = parseFloat((r.valor||'').toString().replace(/\./g,'').replace(',','.').replace(/[^0-9.]/g,''))||0;
           total2 += val2;
           const estadoClass = (r.estado||'').toLowerCase().includes('abonado')?'ok':(r.estado||'').toLowerCase().includes('rechaz')?'err':'pen';
           html2 += `<div class="res-card-facturas">
