@@ -712,7 +712,7 @@ textarea.inp{resize:vertical;min-height:80px}
 <script>
 // ── Config ────────────────────────────────────────────────────
 const PASS = "1ncent1vosCoris#";
-const ASU  = "https://script.google.com/macros/s/AKfycbzwbJBnS8HGHk0W8a0qq-zqEWLI4yXA9bNr8Tc_ycS93ZhBpipmCYQEwfVhZW9mSB-w/exec";
+const ASU  = "https://script.google.com/macros/s/AKfycbykFiFg_gdBh5B5cPrJcLVrq69jYOO2x64ZI85cAG33wek8VlXT8au-UpvNyRPO4ewk/exec";
 const SHEET_ID          = "1LoYXaMIks7aGj9QXIqEzKm5v_Rd5z4sfKr5WhNL2P_4";
 const SHEET_FACTURAS_ID = "1KidBlI65v7qmasAiEAIoWj3Eb80OfA0tclWvYDVlOwM";
 
@@ -885,8 +885,43 @@ async function buscar(){
     });
     html+=`<div class="total-box">Total pagado: $${total.toLocaleString('es-CO')}<br>
       <small style="font-weight:600;font-size:.76rem">${found.length} registro(s)</small></div>`;
-    document.getElementById('s-res').innerHTML=html;
-    msg('s-msg','ok',`${found.length} registro(s) encontrado(s).`);
+    // Agregar sección incentivos
+    document.getElementById('s-res').innerHTML =
+      `<span class="section-title section-title-incentivos">🎴 Tarjetas Incentivos — ${found.length} registro(s)</span>` + html;
+    msg('s-msg','ok',`${found.length} registro(s) de incentivos encontrado(s). Buscando facturas...`);
+
+    // ── Buscar facturas via Apps Script ──
+    try{
+      const fd2 = new FormData();
+      fd2.append('action','buscarFacturas');
+      fd2.append('cedula', ced);
+      const r2 = await fetch(ASU, {method:'POST', body:fd2});
+      const d2 = await r2.json();
+      if(d2.status==='ok' && d2.results && d2.results.length > 0){
+        let html2 = `<div style="margin-top:1rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${d2.results.length} registro(s)</span></div>`;
+        let total2 = 0;
+        d2.results.forEach(r=>{
+          const val2 = parseFloat((r.valor||'').toString().replace(/[^0-9.]/g,''))||0;
+          total2 += val2;
+          const estadoClass = (r.estado||'').toLowerCase().includes('abonado')?'ok':(r.estado||'').toLowerCase().includes('rechaz')?'err':'pen';
+          html2 += `<div class="res-card-facturas">
+            <div class="res-name">${r.agente||'—'}</div>
+            <div class="res-row"><span class="res-k">Cédula</span><span class="res-v">${r.cedula||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r.agencia||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r.ejecutivo||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Periodo</span><span class="res-v">${r.periodo||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Medio de pago</span><span class="res-v">${r.medioPago||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Estado</span><span class="res-v estado-${estadoClass}">${r.estado||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Valor</span><span class="res-v">$${val2.toLocaleString('es-CO')}</span></div>
+          </div>`;
+        });
+        html2 += `<div class="total-box-facturas">Total facturas: $${total2.toLocaleString('es-CO')}<br>
+          <small style="font-weight:600;font-size:.76rem">${d2.results.length} registro(s)</small></div>`;
+        document.getElementById('s-res').innerHTML += html2;
+        msg('s-msg','ok',`Búsqueda completa — ${found.length} incentivo(s) + ${d2.results.length} factura(s).`);
+      }
+    }catch(e2){ console.error('Facturas error:', e2); }
+
   }catch(e){
     msg('s-msg','err', e.message || 'Error al consultar la hoja.');
     console.error('Buscar error:', e);
