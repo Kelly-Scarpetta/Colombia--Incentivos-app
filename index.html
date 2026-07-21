@@ -887,6 +887,7 @@ async function buscar(){
       <small style="font-weight:600;font-size:.76rem">${found.length} registro(s)</small></div>`;
     // Agregar sección incentivos
     document.getElementById('s-res').innerHTML =
+      (found.length > 0 ? `<span class="section-title section-title-incentivos">🎴 Tarjetas Incentivos — ${found.length} registro(s)</span>` + html : '');
       `<span class="section-title section-title-incentivos">🎴 Tarjetas Incentivos — ${found.length} registro(s)</span>` + html;
     msg('s-msg','ok',`${found.length} registro(s) de incentivos encontrado(s). Buscando facturas...`);
 
@@ -900,7 +901,7 @@ async function buscar(){
       if(d2.status==='ok' && d2.results && d2.results.length > 0){
         let html2 = `<div style="margin-top:1rem"><span class="section-title section-title-facturas">💳 Pago de Facturas — ${d2.results.length} registro(s)</span></div>`;
         let total2 = 0;
-        d2.results.forEach(r=>{
+        d2.results.filter(r=>(r.estado||'').toLowerCase().includes('abonado')).forEach(r=>{
           const val2 = parseFloat((r.valor||'').toString().replace(/[^0-9.]/g,''))||0;
           total2 += val2;
           const estadoClass = (r.estado||'').toLowerCase().includes('abonado')?'ok':(r.estado||'').toLowerCase().includes('rechaz')?'err':'pen';
