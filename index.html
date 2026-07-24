@@ -404,7 +404,7 @@ textarea.inp{resize:vertical;min-height:80px}
           📄 Descargar PDF
         </button>
         <button class="btn-p" onclick="compartirHistorial()" style="flex:1;min-width:140px;background:rgba(10,42,46,.85);">
-          📤 Compartir
+          📤 Compartir PDF
         </button>
       </div>
     </div>
@@ -935,23 +935,14 @@ function generarPDF(){
   win.document.close();
 }
 
-async function compartirHistorial(){
-  const contenido = document.getElementById('s-res');
-  if(!contenido || contenido.innerHTML.trim()===''){
-    alert('Primero realiza una búsqueda para compartir el historial.');
+function compartirHistorial(){
+  const contenido = document.getElementById('s-res').innerHTML;
+  if(!contenido || contenido.trim()===''){
+    alert('Primero realiza una búsqueda.');
     return;
   }
-  if(navigator.share){
-    try{
-      const texto = contenido.innerText;
-      await navigator.share({title:'Historial de Pagos - Coris Latam', text:texto});
-    }catch(e){}
-  } else {
-    const texto = contenido.innerText;
-    navigator.clipboard.writeText(texto).then(()=>{
-      alert('Historial copiado al portapapeles. Pégalo en WhatsApp o correo.');
-    });
-  }
+  // Abre el PDF en nueva ventana — desde ahí se puede guardar y compartir por WhatsApp
+  generarPDF();
 }
 
 function msg(id,type,text){
