@@ -852,15 +852,28 @@ async function generarPDF(){
     doc.setFillColor(132, 196, 11);
     doc.rect(0, 34, pageW, 2, 'F');
 
-    // Logo - larger and centered vertically in header
+    // Logo - convert PNG to JPEG for jsPDF compatibility
     try{
-      doc.addImage('data:image/png;base64,' + LOGO_B64, 'PNG', margin, 5, 70, 24);
+      const logoCanvas = document.createElement('canvas');
+      const logoImg = new Image();
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+        logoImg.src = 'data:image/png;base64,' + LOGO_B64;
+      });
+      logoCanvas.width = logoImg.width;
+      logoCanvas.height = logoImg.height;
+      const lctx = logoCanvas.getContext('2d');
+      lctx.fillStyle = '#102F35';
+      lctx.fillRect(0, 0, logoCanvas.width, logoCanvas.height);
+      lctx.drawImage(logoImg, 0, 0);
+      const logoJpeg = logoCanvas.toDataURL('image/jpeg', 0.95);
+      doc.addImage(logoJpeg, 'JPEG', margin, 5, 70, 24);
     }catch(imgErr){
-      // If logo fails, show text
       doc.setTextColor(132, 196, 11);
       doc.setFontSize(14);
       doc.setFont('helvetica','bold');
-      doc.text('ASSIST 1', margin, 20);
+      doc.text('ASSIST 1 · CORIS LATAM', margin, 20);
     }
 
     // Title right side
