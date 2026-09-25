@@ -275,10 +275,34 @@ textarea.inp{resize:vertical;min-height:80px}
 }
 .section-title-incentivos { background:rgba(132,196,11,.15);color:#3d6600; }
 .section-title-facturas   { background:rgba(42,138,148,.12);color:#0A5A62; }
+.section-title-bd         { background:rgba(232,160,32,.15);color:#8A5800; }
+.section-title-rut        { background:rgba(42,138,148,.15);color:#0A5A62; }
+.res-card-rut {
+  background:rgba(255,255,255,.92);border-radius:1rem;padding:.9rem 1rem;
+  margin-bottom:.65rem;border-left:4px solid #0A5A62;
+  border-top:1px solid rgba(42,138,148,.15);
+  border-right:1px solid rgba(42,138,148,.1);
+  border-bottom:1px solid rgba(42,138,148,.1);
+}
 .total-box-facturas {
   background:#2A8A94;color:#fff;border-radius:1rem;
   padding:.9rem;text-align:center;margin-top:.5rem;font-weight:800;
 }
+.res-card-bd {
+  background:rgba(255,255,255,.92);border-radius:1rem;padding:.9rem 1rem;
+  margin-bottom:.65rem;border-left:4px solid #E8A020;
+  border-top:1px solid rgba(232,160,32,.15);
+  border-right:1px solid rgba(232,160,32,.1);
+  border-bottom:1px solid rgba(232,160,32,.1);
+}
+.res-card-bd .res-name{font-weight:800;color:var(--dark);margin-bottom:.35rem;font-size:.9rem;}
+.resp-pill {
+  display:inline-block; padding:.2rem .6rem; border-radius:999px;
+  font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em;
+}
+.pill-factura     { background:rgba(217,79,61,.12);color:#A83020; }
+.pill-nofactura   { background:rgba(132,196,11,.15);color:#4A7A00; }
+.pill-validar     { background:rgba(232,160,32,.12);color:#8A5800; }
 
 .search-tabs{display:flex;gap:.5rem;margin-bottom:1rem}
 .search-tab{flex:1;padding:.6rem;border:1.5px solid rgba(16,47,53,.15);border-radius:.75rem;background:rgba(255,255,255,.6);font-family:'Manrope',sans-serif;font-weight:700;font-size:.82rem;cursor:pointer;transition:all .15s;color:var(--sec);text-align:center}
@@ -958,9 +982,61 @@ async function buscar(){
         html2 += `<div class="total-box-facturas">Total facturas: $${total2.toLocaleString('es-CO')}<br>
           <small style="font-weight:600;font-size:.76rem">${d2.results.length} registro(s)</small></div>`;
         document.getElementById('s-res').innerHTML += html2;
-        msg('s-msg','ok',`Búsqueda completa — ${found.length} incentivo(s) + ${d2.results.length} factura(s).`);
       }
     }catch(e2){ console.error('Facturas error:', e2); }
+
+    // ── Buscar estado del agente en la Base de Datos (hoja BD) ──
+    try{
+      const fd3 = new FormData();
+      fd3.append('action','buscarBD');
+      fd3.append('cedula', ced);
+      if (mail) fd3.append('correo', mail);
+      const r3 = await fetch(ASU, {method:'POST', body:fd3});
+      const d3 = await r3.json();
+      if(d3.status==='ok' && d3.results && d3.results.length > 0){
+        let html3 = `<div style="margin-top:1rem"><span class="section-title section-title-bd">🪪 Estado del Agente — ${d3.results.length} registro(s)</span></div>`;
+        d3.results.forEach(r=>{
+          const resp = (r.responsabilidadLegal||'').toUpperCase();
+          const respClass = resp.includes('DEBE')?'pill-factura':resp.includes('VALIDAR')?'pill-validar':'pill-nofactura';
+          html3 += `<div class="res-card-bd">
+            <div class="res-name">${r.nombreCompleto||'—'}</div>
+            <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r.agencia||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Rol</span><span class="res-v">${r.rol||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Estado tarjeta</span><span class="res-v">${r.tarjetaEstado||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Responsabilidad legal</span><span class="res-v"><span class="resp-pill ${respClass}">${r.responsabilidadLegal||'—'}</span></span></div>
+            <div class="res-row"><span class="res-k">Estado agencia</span><span class="res-v">${r.estado||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Entregada</span><span class="res-v">${r.entregada||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Fecha emisión tarjeta</span><span class="res-v">${r.fechaEmisionTarjeta||'—'}</span></div>
+            ${r.novedades?`<div class="res-row"><span class="res-k">Novedades</span><span class="res-v">${r.novedades}</span></div>`:''}
+          </div>`;
+        });
+        document.getElementById('s-res').innerHTML += html3;
+      }
+    }catch(e3){ console.error('BD error:', e3); }
+
+    // ── Buscar solicitud de RUT (Form "Solicitar Tarjeta") ──────
+    try{
+      const fd4 = new FormData();
+      fd4.append('action','buscarSolicitudRUT');
+      fd4.append('cedula', ced);
+      if (mail) fd4.append('correo', mail);
+      const r4 = await fetch(ASU, {method:'POST', body:fd4});
+      const d4 = await r4.json();
+      if(d4.status==='ok' && d4.results && d4.results.length > 0){
+        let html4 = `<div style="margin-top:1rem"><span class="section-title section-title-rut">📄 Solicitud de RUT — ${d4.results.length} registro(s)</span></div>`;
+        d4.results.forEach(r=>{
+          html4 += `<div class="res-card-rut">
+            <div class="res-row"><span class="res-k">Fecha de solicitud</span><span class="res-v">${r.fechaSolicitud||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Agencia</span><span class="res-v">${r.agencia||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Ejecutivo</span><span class="res-v">${r.ejecutivo||'—'}</span></div>
+            <div class="res-row"><span class="res-k">Confirmación</span><span class="res-v">${r.confirmacion||'—'}</span></div>
+            ${r.rutUrl?`<div class="res-row"><span class="res-k">RUT</span><span class="res-v"><a href="${r.rutUrl}" target="_blank" rel="noopener">Ver documento</a></span></div>`:''}
+          </div>`;
+        });
+        document.getElementById('s-res').innerHTML += html4;
+      }
+      msg('s-msg','ok',`${found.length} registro(s) de incentivos encontrado(s). Búsqueda completa.`);
+    }catch(e4){ console.error('Solicitud RUT error:', e4); }
 
   }catch(e){
     msg('s-msg','err', e.message || 'Error al consultar la hoja.');
